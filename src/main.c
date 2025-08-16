@@ -49,6 +49,7 @@ void* ArenaAlloc(Arena* arena, size_t sizeOfAllocation){
 }
 
 void ArenaDealloc(Arena* arena, Ball* ball){
+    // memset 0
     u8* ballByte = (u8*) ball;
     for(int i = 0; i < sizeof(Ball); i++){
          ballByte[i] = 0;
@@ -63,21 +64,24 @@ void ResetArena(Arena* arena){
     arena->size = 0;
     arena->freelist = NULL;
 
+    // memset 0
     for(int i = 0; i < arena->capacity; i++){
         arena->buffer[i] = 0;
     }
 }
 
 int main(){
-    const int WIDTH = 1024;
+    const int WIDTH = 1000;
     const int HEIGHT = 900;
+    size_t ball_count = 0;
 
     InitWindow(WIDTH, HEIGHT, "Ball Arena Demo");
     SetTargetFPS(144);
 
     Arena arena = {0};
-    InitArena(&arena, 8 * 1024);
+    InitArena(&arena, 480);
     printf("Arena initialized at: %p\n", arena.buffer);
+    printf("BALL STRUCT SIZE: %lu\n", sizeof(Ball));
 
     while (!WindowShouldClose()) {
         if (IsKeyPressed(KEY_SPACE)) {
@@ -96,9 +100,23 @@ int main(){
             }
         }
 
+        ball_count = arena.size / sizeof(Ball);
+        
+        if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+            int x = GetMouseX();
+            int y = GetMouseY();
+            
+            for(size_t i = 0; i < ball_count; i++){
+                Ball* b = (Ball*)(arena.buffer + i * sizeof(Ball));
+                if(x < b->x + b->size && x > b->x - b->size && y > b->y - b->size && y < b->y + b->size){
+                    ArenaDealloc(&arena, b);
+                    break;
+                }
+            }
+        }
+
         BeginDrawing();
             ClearBackground(RAYWHITE);
-            size_t ball_count = arena.size / sizeof(Ball);
 
             for (size_t i = 0; i < ball_count; i++) {
                 Ball* b = (Ball*)(arena.buffer + i * sizeof(Ball));
@@ -108,6 +126,17 @@ int main(){
                     DrawCircle(b->x, b->y, b->size, 
                               (Color){b->r, b->g, b->b, 255});
                 }
+            }
+
+            DrawRectangle(260, 880, 480, 20, BLUE);
+            Freelist* curr = arena.freelist;
+            while(curr != NULL){
+                size_t offset = (u8*)curr - arena.buffer;
+
+                int posX = 260 + (int)((float)offset / arena.capacity * 480);
+                int posY = 880;
+                DrawRectangle(posX, posY, 24, 20, RED);
+                curr = curr->next;
             }
             
             DrawText("Press SPACE to create balls", 10, 10, 20, DARKGRAY);
